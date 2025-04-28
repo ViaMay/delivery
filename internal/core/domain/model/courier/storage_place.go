@@ -17,10 +17,7 @@ var (
 	ErrCannotStoreOrder = errors.New("cannot store order: place is not empty or volume too large")
 )
 
-func NewStoragePlace(id uuid.UUID, name string, totalVolume int) (*StoragePlace, error) {
-	if id == uuid.Nil {
-		return nil, errs.NewValueIsRequiredError("ID")
-	}
+func NewStoragePlace(name string, totalVolume int) (*StoragePlace, error) {
 	if name == "" {
 		return nil, errs.NewValueIsRequiredError("name")
 	}
@@ -28,7 +25,7 @@ func NewStoragePlace(id uuid.UUID, name string, totalVolume int) (*StoragePlace,
 		return nil, errs.NewValueIsRequiredError("totalVolume")
 	}
 	return &StoragePlace{
-		id:          id,
+		id:          uuid.New(),
 		name:        name,
 		totalVolume: totalVolume,
 		orderId:     nil,
@@ -78,5 +75,8 @@ func (s *StoragePlace) RemoveOrder() {
 }
 
 func (s *StoragePlace) Equals(other *StoragePlace) bool {
+	if other == nil {
+		return false
+	}
 	return s.id == other.id
 }
