@@ -48,7 +48,7 @@ func Test_Location_DistanceTo(t *testing.T) {
 	location2, _ := NewLocation(5, 6)
 
 	// Steps
-	distance := location1.DistanceTo(location2)
+	distance, _ := location1.DistanceTo(location2)
 
 	// Assert
 	assert.Equal(t, 6, distance) // |5-2| + |6-3| = 3 + 3 = 6
