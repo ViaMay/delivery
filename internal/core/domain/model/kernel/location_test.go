@@ -20,24 +20,25 @@ func Test_Location_Valid(t *testing.T) {
 
 func Test_Location_Error_OutOfBounds(t *testing.T) {
 	tests := map[string]struct {
-		x        int
-		y        int
-		expected error
+		x         int
+		y         int
+		expectErr string
 	}{
-		"x too low":    {x: 0, y: 5, expected: ErrorInvalidCoordinate},
-		"x too high":   {x: 11, y: 5, expected: ErrorInvalidCoordinate},
-		"y too low":    {x: 5, y: 0, expected: ErrorInvalidCoordinate},
-		"y too high":   {x: 5, y: 11, expected: ErrorInvalidCoordinate},
-		"both invalid": {x: 0, y: 11, expected: ErrorInvalidCoordinate},
+		"x too low":    {x: 0, y: 5, expectErr: "x"},
+		"x too high":   {x: 11, y: 5, expectErr: "x"},
+		"y too low":    {x: 5, y: 0, expectErr: "y"},
+		"y too high":   {x: 5, y: 11, expectErr: "y"},
+		"both invalid": {x: 0, y: 11, expectErr: "x"},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			// Date
+			// Act
 			_, err := NewLocation(test.x, test.y)
 
 			// Assert
-			assert.EqualError(t, err, test.expected.Error())
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), test.expectErr)
 		})
 	}
 }

@@ -10,41 +10,33 @@ import (
 )
 
 func Test_NewStoragePlace_Success(t *testing.T) {
-	id := uuid.New()
 	name := "bag"
 	totalVolume := 10
 
-	sp, err := courier.NewStoragePlace(id, name, totalVolume)
+	sp, err := courier.NewStoragePlace(name, totalVolume)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, sp)
-	assert.Equal(t, id, sp.ID())
 	assert.Equal(t, name, sp.Name())
 	assert.Equal(t, totalVolume, sp.TotalVolume())
 	assert.True(t, sp.IsEmpty())
 	assert.Nil(t, sp.OrderID())
 }
 
-func Test_StoragePlace_NewStoragePlace_Invalid_ID(t *testing.T) {
-	sp, err := courier.NewStoragePlace(uuid.Nil, "bag", 10)
-	assert.Nil(t, sp)
-	assert.Contains(t, err.Error(), "ID")
-}
-
 func Test_StoragePlace_NewStoragePlace_Empty_Name(t *testing.T) {
-	sp, err := courier.NewStoragePlace(uuid.New(), "", 10)
+	sp, err := courier.NewStoragePlace("", 10)
 	assert.Nil(t, sp)
 	assert.Contains(t, err.Error(), "name")
 }
 
 func Test_StoragePlace_NewStoragePlace_Invalid_Volume(t *testing.T) {
-	sp, err := courier.NewStoragePlace(uuid.New(), "bag", 0)
+	sp, err := courier.NewStoragePlace("bag", 0)
 	assert.Nil(t, sp)
 	assert.Contains(t, err.Error(), "totalVolume")
 }
 
 func Test_StoragePlace_IsEmpty(t *testing.T) {
-	sp, _ := courier.NewStoragePlace(uuid.New(), "bag", 10)
+	sp, _ := courier.NewStoragePlace("bag", 10)
 	assert.True(t, sp.IsEmpty())
 
 	orderID := uuid.New()
@@ -54,7 +46,7 @@ func Test_StoragePlace_IsEmpty(t *testing.T) {
 }
 
 func Test_StoragePlace_CanStore(t *testing.T) {
-	sp, _ := courier.NewStoragePlace(uuid.New(), "bag", 10)
+	sp, _ := courier.NewStoragePlace("bag", 10)
 
 	assert.True(t, sp.CanStore(5))
 	assert.False(t, sp.CanStore(15))
@@ -66,7 +58,7 @@ func Test_StoragePlace_CanStore(t *testing.T) {
 }
 
 func Test_StoragePlace_StoreOrder_Success(t *testing.T) {
-	sp, _ := courier.NewStoragePlace(uuid.New(), "Рюкзак", 10)
+	sp, _ := courier.NewStoragePlace("Рюкзак", 10)
 	orderID := uuid.New()
 
 	err := sp.StoreOrder(orderID, 5)
@@ -77,7 +69,7 @@ func Test_StoragePlace_StoreOrder_Success(t *testing.T) {
 }
 
 func Test_StoragePlace_StoreOrder_Fail_NilOrderID(t *testing.T) {
-	sp, _ := courier.NewStoragePlace(uuid.New(), "bag", 10)
+	sp, _ := courier.NewStoragePlace("bag", 10)
 
 	err := sp.StoreOrder(uuid.Nil, 5)
 
@@ -86,7 +78,7 @@ func Test_StoragePlace_StoreOrder_Fail_NilOrderID(t *testing.T) {
 }
 
 func Test_StoragePlace_StoreOrder_Fail_ZeroVolume(t *testing.T) {
-	sp, _ := courier.NewStoragePlace(uuid.New(), "bag", 10)
+	sp, _ := courier.NewStoragePlace("bag", 10)
 
 	err := sp.StoreOrder(uuid.New(), 0)
 
@@ -95,7 +87,7 @@ func Test_StoragePlace_StoreOrder_Fail_ZeroVolume(t *testing.T) {
 }
 
 func Test_StoragePlace_StoreOrder_Fail_CannotStore(t *testing.T) {
-	sp, _ := courier.NewStoragePlace(uuid.New(), "bag", 5)
+	sp, _ := courier.NewStoragePlace("bag", 5)
 
 	// Volume too large
 	err := sp.StoreOrder(uuid.New(), 10)
@@ -112,7 +104,7 @@ func Test_StoragePlace_StoreOrder_Fail_CannotStore(t *testing.T) {
 }
 
 func Test_StoragePlace_RemoveOrder(t *testing.T) {
-	sp, _ := courier.NewStoragePlace(uuid.New(), "bag", 10)
+	sp, _ := courier.NewStoragePlace("bag", 10)
 	orderID := uuid.New()
 	_ = sp.StoreOrder(orderID, 5)
 
@@ -124,13 +116,10 @@ func Test_StoragePlace_RemoveOrder(t *testing.T) {
 }
 
 func Test_StoragePlace_Equals(t *testing.T) {
-	id := uuid.New()
-	sp1, _ := courier.NewStoragePlace(id, "bag", 10)
-	sp2, _ := courier.NewStoragePlace(id, "bag2", 15)
+	sp1, _ := courier.NewStoragePlace("bag", 10)
+	assert.True(t, sp1.Equals(sp1))
 
-	assert.True(t, sp1.Equals(sp2))
+	sp2, _ := courier.NewStoragePlace("bag2", 15)
 
-	sp3, _ := courier.NewStoragePlace(uuid.New(), "bag3", 20)
-
-	assert.False(t, sp1.Equals(sp3))
+	assert.False(t, sp1.Equals(sp2))
 }

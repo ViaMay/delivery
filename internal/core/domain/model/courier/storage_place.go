@@ -53,6 +53,9 @@ func (s *StoragePlace) IsEmpty() bool {
 }
 
 func (s *StoragePlace) CanStore(orderVolume int) bool {
+	if orderVolume <= 0 {
+		return false
+	}
 	return s.IsEmpty() && orderVolume <= s.totalVolume
 }
 
