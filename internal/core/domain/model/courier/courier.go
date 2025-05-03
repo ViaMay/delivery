@@ -17,7 +17,7 @@ type Courier struct {
 	name             string
 	speed            int
 	location         kernel.Location
-	StoragePlaceList []*StoragePlace
+	storagePlaceList []*StoragePlace
 }
 
 func NewCourier(name string, speed int, location kernel.Location) (*Courier, error) {
@@ -36,7 +36,7 @@ func NewCourier(name string, speed int, location kernel.Location) (*Courier, err
 		name:             name,
 		speed:            speed,
 		location:         location,
-		StoragePlaceList: make([]*StoragePlace, 0),
+		storagePlaceList: make([]*StoragePlace, 0),
 	}, nil
 }
 
@@ -45,7 +45,7 @@ func (c *Courier) AddStoragePlace(name string, totalVolume int) error {
 	if err != nil {
 		return err
 	}
-	c.StoragePlaceList = append(c.StoragePlaceList, storagePlace)
+	c.storagePlaceList = append(c.storagePlaceList, storagePlace)
 	return nil
 
 }
@@ -55,7 +55,7 @@ func (c *Courier) CanTakeOrder(order *order.Order) (bool, error) {
 		return false, errs.NewValueIsRequiredError("order")
 	}
 
-	for _, storagePlace := range c.StoragePlaceList {
+	for _, storagePlace := range c.storagePlaceList {
 		canStore := storagePlace.CanStore(order.Volume())
 		if canStore {
 			return true, nil
@@ -68,7 +68,7 @@ func (c *Courier) TakeOrder(order *order.Order) error {
 	if order == nil {
 		return errs.NewValueIsRequiredError("order")
 	}
-	for _, storagePlace := range c.StoragePlaceList {
+	for _, storagePlace := range c.storagePlaceList {
 		if storagePlace.CanStore(order.Volume()) {
 			return storagePlace.StoreOrder(order.Id(), order.Volume())
 		}
@@ -80,13 +80,13 @@ func (c *Courier) CompleteOrder(order *order.Order) error {
 	if order == nil {
 		return errs.NewValueIsRequiredError("order")
 	}
-	for _, storagePlace := range c.StoragePlaceList {
+	for _, storagePlace := range c.storagePlaceList {
 		if storagePlace.OrderID() != nil && *storagePlace.OrderID() == order.Id() {
 			storagePlace.RemoveOrder()
 			return nil
 		}
 	}
-	return nil
+	return errs.NewObjectNotFoundError("order", order.Id())
 }
 
 func (c *Courier) StepsTo(target kernel.Location) (float64, error) {
@@ -151,8 +151,8 @@ func (c *Courier) Location() kernel.Location {
 }
 
 func (c *Courier) StoragePlaces() []StoragePlace {
-	res := make([]StoragePlace, len(c.StoragePlaceList))
-	for i, storagePlace := range c.StoragePlaceList {
+	res := make([]StoragePlace, len(c.storagePlaceList))
+	for i, storagePlace := range c.storagePlaceList {
 		res[i] = *storagePlace
 	}
 	return res
