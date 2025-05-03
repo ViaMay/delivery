@@ -2,14 +2,9 @@ package kernel
 
 import (
 	"delivery/internal/pkg/errs"
-	"errors"
 	"fmt"
 	"math"
 	"math/rand"
-)
-
-var (
-	ErrorInvalidCoordinate = errors.New("coordinate must be between 1 and 10 inclusive")
 )
 
 const (
