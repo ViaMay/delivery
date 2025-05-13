@@ -77,8 +77,9 @@ func (s *dispatchService) findFastestCourier(order *orderpkg.Order, couriers []*
 		best    *courier.Courier
 		minTime = math.MaxFloat64
 	)
+	location := order.Location()
 	for _, c := range couriers {
-		time, err := c.StepsTo(order.Location())
+		time, err := c.StepsTo(location)
 		if err != nil {
 			return nil, err
 		}
