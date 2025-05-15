@@ -21,62 +21,39 @@ func NewRepository(tracker uow.Tracker) (*Repository, error) {
 	if tracker == nil {
 		return nil, errs.NewValueIsRequiredError("tracker")
 	}
-
-	return &Repository{
-		tracker: tracker,
-	}, nil
+	return &Repository{tracker: tracker}, nil
 }
 
 func (r *Repository) Add(ctx context.Context, aggregate *courier.Courier) error {
-	r.tracker.Track(aggregate)
-
-	dto := DomainToDTO(aggregate)
-
-	// Открыта ли транзакция?
-	isInTransaction := r.tracker.InTx()
-	if !isInTransaction {
-		r.tracker.Begin(ctx)
-	}
-	tx := r.tracker.Tx()
-
-	// Вносим изменения
-	err := tx.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true}).Create(&dto).Error
-	if err != nil {
-		return err
-	}
-
-	// Если не было внешней в транзакции, то коммитим изменения
-	if !isInTransaction {
-		err := r.tracker.Commit(ctx)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return r.saveWithTx(ctx, DomainToDTO(aggregate), true)
 }
 
 func (r *Repository) Update(ctx context.Context, aggregate *courier.Courier) error {
-	r.tracker.Track(aggregate)
+	return r.saveWithTx(ctx, DomainToDTO(aggregate), false)
+}
 
-	dto := DomainToDTO(aggregate)
+func (r *Repository) saveWithTx(ctx context.Context, dto CourierDTO, isCreate bool) error {
+	r.tracker.Track(DtoToDomain(dto)) // предположим, dto знает как получить доменную модель
 
-	// Открыта ли транзакция?
-	isInTransaction := r.tracker.InTx()
-	if !isInTransaction {
+	inTx := r.tracker.InTx()
+	if !inTx {
 		r.tracker.Begin(ctx)
 	}
 	tx := r.tracker.Tx()
 
-	// Вносим изменения
-	err := tx.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true}).Save(&dto).Error
+	var err error
+	session := tx.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true})
+	if isCreate {
+		err = session.Create(&dto).Error
+	} else {
+		err = session.Save(&dto).Error
+	}
 	if err != nil {
 		return err
 	}
 
-	// Если не было внешней в транзакции, то коммитим изменения
-	if !isInTransaction {
-		err := r.tracker.Commit(ctx)
-		if err != nil {
+	if !inTx {
+		if err = r.tracker.Commit(ctx); err != nil {
 			return err
 		}
 	}
@@ -84,47 +61,43 @@ func (r *Repository) Update(ctx context.Context, aggregate *courier.Courier) err
 }
 
 func (r *Repository) Get(ctx context.Context, ID uuid.UUID) (*courier.Courier, error) {
-	dto := CourierDTO{}
-
-	tx := r.getTxOrDb()
-	result := tx.WithContext(ctx).
-		Preload(clause.Associations).
-		Find(&dto, ID)
-	if result.RowsAffected == 0 {
-		return nil, errs.NewObjectNotFoundError(ID.String(), nil)
+	var dto CourierDTO
+	result := r.txOrDb().WithContext(ctx).Preload(clause.Associations).First(&dto, ID)
+	if result.Error != nil {
+		if result.RowsAffected == 0 {
+			return nil, errs.NewObjectNotFoundError(ID.String(), nil)
+		}
+		return nil, result.Error
 	}
-
-	aggregate := DtoToDomain(dto)
-	return aggregate, nil
+	return DtoToDomain(dto), nil
 }
 
 func (r *Repository) GetAllFree(ctx context.Context) ([]*courier.Courier, error) {
 	var dtos []CourierDTO
 
-	tx := r.getTxOrDb()
-	result := tx.WithContext(ctx).
+	err := r.txOrDb().WithContext(ctx).
 		Preload(clause.Associations).
 		Where(`
-        NOT EXISTS (
-            SELECT 1 FROM storage_places sp
-            WHERE sp.courier_id = couriers.id AND sp.order_id IS NOT NULL
-        )`).Find(&dtos)
-	if result.Error != nil {
-		return nil, result.Error
+			NOT EXISTS (
+				SELECT 1 FROM storage_places sp
+				WHERE sp.courier_id = couriers.id AND sp.order_id IS NOT NULL
+			)`).Find(&dtos).Error
+
+	if err != nil {
+		return nil, err
 	}
-	if result.RowsAffected == 0 {
+	if len(dtos) == 0 {
 		return nil, errs.NewObjectNotFoundError("Free couriers", nil)
 	}
 
 	aggregates := make([]*courier.Courier, len(dtos))
-	for i, dto := range dtos {
-		aggregates[i] = DtoToDomain(dto)
+	for i := range dtos {
+		aggregates[i] = DtoToDomain(dtos[i])
 	}
-
 	return aggregates, nil
 }
 
-func (r *Repository) getTxOrDb() *gorm.DB {
+func (r *Repository) txOrDb() *gorm.DB {
 	if tx := r.tracker.Tx(); tx != nil {
 		return tx
 	}
