@@ -157,3 +157,13 @@ func (c *Courier) StoragePlaces() []StoragePlace {
 	}
 	return res
 }
+
+func RestoreCourier(id uuid.UUID, name string, speed int, location kernel.Location, storagePlaces []*StoragePlace) *Courier {
+	return &Courier{
+		id:               id,
+		name:             name,
+		speed:            speed,
+		location:         location,
+		storagePlaceList: storagePlaces,
+	}
+}

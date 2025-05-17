@@ -75,3 +75,13 @@ func (o *Order) Volume() int {
 func (o *Order) Status() Status {
 	return o.status
 }
+
+func RestoreOrder(id uuid.UUID, courierID *uuid.UUID, location kernel.Location, volume int, status Status) *Order {
+	return &Order{
+		id:        id,
+		courierId: courierID,
+		location:  location,
+		volume:    volume,
+		status:    status,
+	}
+}

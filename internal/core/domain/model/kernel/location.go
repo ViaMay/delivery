@@ -76,3 +76,19 @@ func CreateRandom() (Location, error) {
 	}
 	return location, err
 }
+
+func MinLocation() Location {
+	location, err := NewLocation(minX, minY)
+	if err != nil {
+		panic("invalid min location configuration")
+	}
+	return location
+}
+
+func MaxLocation() Location {
+	location, err := NewLocation(maxX, maxY)
+	if err != nil {
+		panic("invalid max location configuration")
+	}
+	return location
+}
