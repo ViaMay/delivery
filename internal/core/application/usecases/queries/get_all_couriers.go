@@ -33,7 +33,7 @@ func NewGetAllCouriersQueryHandler(db *gorm.DB) (GetAllCouriersQueryHandler, err
 	return &getAllCouriersQueryHandler{db: db}, nil
 }
 
-func (q *getAllCouriersQueryHandler) Handle(query GetAllCouriersQuery) (GetAllCouriersResponse, error) {
+func (q *getAllCouriersQueryHandler) Handle(_ GetAllCouriersQuery) (GetAllCouriersResponse, error) {
 	var couriers []CourierResponse
 	result := q.db.Raw("SELECT id, name, location_x, location_y FROM couriers").Scan(&couriers)
 

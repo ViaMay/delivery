@@ -37,7 +37,7 @@ func NewGetNotCompletedOrdersQueryHandler(db *gorm.DB) (GetNotCompletedOrdersQue
 	return &getNotCompletedOrdersQueryHandler{db: db}, nil
 }
 
-func (h *getNotCompletedOrdersQueryHandler) Handle(query GetNotCompletedOrdersQuery) (GetNotCompletedOrdersResponse, error) {
+func (h *getNotCompletedOrdersQueryHandler) Handle(_ GetNotCompletedOrdersQuery) (GetNotCompletedOrdersResponse, error) {
 	var orders []OrderResponse
 
 	result := h.db.Raw(`
