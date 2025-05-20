@@ -11,12 +11,15 @@ import (
 )
 
 func main() {
+	log.SetLevel(log.DEBUG)
+
 	configs := getConfigs()
 
 	app := cmd.NewCompositionRoot(
 		configs,
 	)
 	startWebServer(app, configs.HttpPort)
+	app.StartCronJobs()
 }
 
 func getConfigs() cmd.Config {
