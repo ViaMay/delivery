@@ -1,30 +1,29 @@
 package cmd
 
 import (
-	"delivery/internal/adapters/in/jobs"
 	"delivery/internal/adapters/out/postgres"
 	"delivery/internal/core/application/usecases/commands"
 	"delivery/internal/core/application/usecases/queries"
 	services "delivery/internal/core/domain/sevices"
 	"delivery/internal/core/ports"
+	"delivery/internal/jobs"
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 	"log"
 )
 
 type CompositionRoot struct {
-	configs         Config
-	gormDb          *gorm.DB
-	DomainServices  DomainServices
-	Repositories    Repositories
-	CommandHandlers CommandHandlers
-	QueryHandlers   QueryHandlers
-	Jobs            Jobs
+	configs Config
+	gormDb  *gorm.DB
+
+	closers []Closer
 }
 
-func NewCompositionRoot(_ Config) CompositionRoot {
-	app := CompositionRoot{}
-	return app
+func NewCompositionRoot(configs Config, gormDb *gorm.DB) *CompositionRoot {
+	return &CompositionRoot{
+		configs: configs,
+		gormDb:  gormDb,
+	}
 }
 
 func (cr *CompositionRoot) NewDispatchService() services.DispatchService {
@@ -111,58 +110,18 @@ type QueryHandlers struct {
 	GetNotCompletedOrdersQueryHandler queries.GetNotCompletedOrdersQueryHandler
 }
 
-type Jobs struct {
-	AssignOrdersJob cron.Job
-	MoveCouriersJob cron.Job
-}
-
-func (cr *CompositionRoot) NewAssignOrdersJob() *jobs.AssignOrdersJob {
+func (cr *CompositionRoot) NewAssignOrdersJob() cron.Job {
 	job, err := jobs.NewAssignOrdersJob(cr.NewAssignOrdersCommandHandler())
 	if err != nil {
-		log.Fatalf("failed to create AssignOrdersJob: %v", err)
+		log.Fatalf("cannot create AssignOrdersJob: %v", err)
 	}
 	return job
 }
 
-func (cr *CompositionRoot) NewMoveCouriersJob() *jobs.MoveCouriersJob {
+func (cr *CompositionRoot) NewMoveCouriersJob() cron.Job {
 	job, err := jobs.NewMoveCouriersJob(cr.NewMoveCouriersCommandHandler())
 	if err != nil {
-		log.Fatalf("failed to create MoveCouriersJob: %v", err)
+		log.Fatalf("cannot create MoveCouriersJob: %v", err)
 	}
 	return job
-}
-
-func (cr *CompositionRoot) StartCronJobs() {
-	c := cron.New(cron.WithSeconds())
-
-	assignJob := cr.NewAssignOrdersJob()
-	moveJob := cr.NewMoveCouriersJob()
-
-	if _, err := c.AddJob("@every 1s", assignJob); err != nil {
-		log.Fatalf("failed to schedule AssignOrdersJob: %v", err)
-	}
-
-	if _, err := c.AddJob("@every 2s", moveJob); err != nil {
-		log.Fatalf("failed to schedule MoveCouriersJob: %v", err)
-	}
-
-	c.Start()
-	log.Println("Cron jobs started")
-}
-
-func (cr *CompositionRoot) NewJobs() Jobs {
-	assignOrdersJob, err := jobs.NewAssignOrdersJob(cr.NewAssignOrdersCommandHandler())
-	if err != nil {
-		log.Fatalf("failed to create assignOrdersJob: %v", err)
-	}
-
-	moveCouriersJob, err := jobs.NewMoveCouriersJob(cr.NewMoveCouriersCommandHandler())
-	if err != nil {
-		log.Fatalf("failed to create moveCouriersJob: %v", err)
-	}
-
-	return Jobs{
-		AssignOrdersJob: assignOrdersJob,
-		MoveCouriersJob: moveCouriersJob,
-	}
 }
