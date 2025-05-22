@@ -11,10 +11,7 @@ import (
 )
 
 func (s *Server) GetCouriers(c echo.Context) error {
-	query, err := queries.NewGetAllCouriersQuery()
-	if err != nil {
-		return problems.NewBadRequest(err.Error())
-	}
+	query := queries.GetAllCouriersQuery{}
 
 	response, err := s.getAllCouriersQueryHandler.Handle(query)
 	if err != nil {

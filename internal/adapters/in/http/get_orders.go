@@ -11,10 +11,7 @@ import (
 )
 
 func (s *Server) GetOrders(c echo.Context) error {
-	query, err := queries.NewGetNotCompletedOrdersQuery()
-	if err != nil {
-		return problems.NewBadRequest(err.Error())
-	}
+	query := queries.GetNotCompletedOrdersQuery{}
 
 	response, err := s.getNotCompletedOrdersQueryHandler.Handle(query)
 	if err != nil {
