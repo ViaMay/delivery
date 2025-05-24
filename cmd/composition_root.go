@@ -6,6 +6,8 @@ import (
 	"delivery/internal/core/application/usecases/queries"
 	services "delivery/internal/core/domain/sevices"
 	"delivery/internal/core/ports"
+	"delivery/internal/jobs"
+	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 	"log"
 )
@@ -13,11 +15,15 @@ import (
 type CompositionRoot struct {
 	configs Config
 	gormDb  *gorm.DB
+
+	closers []Closer
 }
 
-func NewCompositionRoot(_ Config) CompositionRoot {
-	app := CompositionRoot{}
-	return app
+func NewCompositionRoot(configs Config, gormDb *gorm.DB) *CompositionRoot {
+	return &CompositionRoot{
+		configs: configs,
+		gormDb:  gormDb,
+	}
 }
 
 func (cr *CompositionRoot) NewDispatchService() services.DispatchService {
@@ -80,4 +86,42 @@ func (cr *CompositionRoot) NewGetNotCompletedOrdersQueryHandler() queries.GetNot
 		log.Fatalf("cannot create GetNotCompletedOrdersQueryHandler: %v", err)
 	}
 	return getNotCompletedOrdersQueryHandler
+}
+
+type DomainServices struct {
+	OrderDispatcher services.DispatchService
+}
+
+type Repositories struct {
+	UnitOfWork        ports.UnitOfWork
+	OrderRepository   ports.OrderRepository
+	CourierRepository ports.CourierRepository
+}
+
+type CommandHandlers struct {
+	AssignOrdersCommandHandler  commands.AssignOrdersCommandHandler
+	CreateOrderCommandHandler   commands.CreateOrderCommandHandler
+	CreateCourierCommandHandler commands.CreateCourierCommandHandler
+	MoveCouriersCommandHandler  commands.MoveCouriersCommandHandler
+}
+
+type QueryHandlers struct {
+	GetAllCouriersQueryHandler        queries.GetAllCouriersQueryHandler
+	GetNotCompletedOrdersQueryHandler queries.GetNotCompletedOrdersQueryHandler
+}
+
+func (cr *CompositionRoot) NewAssignOrdersJob() cron.Job {
+	job, err := jobs.NewAssignOrdersJob(cr.NewAssignOrdersCommandHandler())
+	if err != nil {
+		log.Fatalf("cannot create AssignOrdersJob: %v", err)
+	}
+	return job
+}
+
+func (cr *CompositionRoot) NewMoveCouriersJob() cron.Job {
+	job, err := jobs.NewMoveCouriersJob(cr.NewMoveCouriersCommandHandler())
+	if err != nil {
+		log.Fatalf("cannot create MoveCouriersJob: %v", err)
+	}
+	return job
 }
