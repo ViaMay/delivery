@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	grpcout "delivery/internal/adapters/out/grpc/geo"
 	"delivery/internal/adapters/out/postgres"
 	"delivery/internal/core/application/usecases/commands"
 	"delivery/internal/core/application/usecases/queries"
@@ -10,13 +11,16 @@ import (
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 	"log"
+	"sync"
 )
 
 type CompositionRoot struct {
-	configs Config
-	gormDb  *gorm.DB
+	configs   Config
+	gormDb    *gorm.DB
+	geoClient ports.GeoClient
 
 	closers []Closer
+	onceGeo sync.Once
 }
 
 func NewCompositionRoot(configs Config, gormDb *gorm.DB) *CompositionRoot {
@@ -88,28 +92,6 @@ func (cr *CompositionRoot) NewGetNotCompletedOrdersQueryHandler() queries.GetNot
 	return getNotCompletedOrdersQueryHandler
 }
 
-type DomainServices struct {
-	OrderDispatcher services.DispatchService
-}
-
-type Repositories struct {
-	UnitOfWork        ports.UnitOfWork
-	OrderRepository   ports.OrderRepository
-	CourierRepository ports.CourierRepository
-}
-
-type CommandHandlers struct {
-	AssignOrdersCommandHandler  commands.AssignOrdersCommandHandler
-	CreateOrderCommandHandler   commands.CreateOrderCommandHandler
-	CreateCourierCommandHandler commands.CreateCourierCommandHandler
-	MoveCouriersCommandHandler  commands.MoveCouriersCommandHandler
-}
-
-type QueryHandlers struct {
-	GetAllCouriersQueryHandler        queries.GetAllCouriersQueryHandler
-	GetNotCompletedOrdersQueryHandler queries.GetNotCompletedOrdersQueryHandler
-}
-
 func (cr *CompositionRoot) NewAssignOrdersJob() cron.Job {
 	job, err := jobs.NewAssignOrdersJob(cr.NewAssignOrdersCommandHandler())
 	if err != nil {
@@ -124,4 +106,16 @@ func (cr *CompositionRoot) NewMoveCouriersJob() cron.Job {
 		log.Fatalf("cannot create MoveCouriersJob: %v", err)
 	}
 	return job
+}
+
+func (cr *CompositionRoot) NewGeoClient() ports.GeoClient {
+	cr.onceGeo.Do(func() {
+		client, err := grpcout.NewClient(cr.configs.GeoServiceGrpcHost)
+		if err != nil {
+			log.Fatalf("cannot create GeoClient: %v", err)
+		}
+		cr.RegisterCloser(client)
+		cr.geoClient = client
+	})
+	return cr.geoClient
 }
