@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"delivery/internal/core/domain/model/kernel"
 	"delivery/internal/core/domain/model/order"
 	"delivery/internal/core/ports"
 	"delivery/internal/pkg/errs"
@@ -16,16 +15,21 @@ var _ CreateOrderCommandHandler = &createOrderCommandHandler{}
 
 type createOrderCommandHandler struct {
 	unitOfWork ports.UnitOfWork
+	geoClient  ports.GeoClient
 }
 
-func NewCreateOrderCommandHandler(unitOfWork ports.UnitOfWork) (CreateOrderCommandHandler, error) {
+func NewCreateOrderCommandHandler(unitOfWork ports.UnitOfWork, geoClient ports.GeoClient) (CreateOrderCommandHandler, error) {
 	if unitOfWork == nil {
 		return nil, errs.NewValueIsRequiredError("unitOfWork")
 	}
 
+	if geoClient == nil {
+		return nil, errs.NewValueIsRequiredError("geoClient")
+	}
+
 	return &createOrderCommandHandler{
 		unitOfWork: unitOfWork,
-	}, nil
+		geoClient:  geoClient}, nil
 }
 
 func (ch *createOrderCommandHandler) Handle(ctx context.Context, command *CreateOrderCommand) error {
@@ -41,7 +45,10 @@ func (ch *createOrderCommandHandler) Handle(ctx context.Context, command *Create
 		return nil
 	}
 
-	location, _ := kernel.CreateRandom()
+	location, err := ch.geoClient.GetGeolocation(ctx, command.Street)
+	if err != nil {
+		return err
+	}
 
 	newOrder, err := order.NewOrder(command.OrderID, location, command.Volume)
 	if err != nil {

@@ -5,7 +5,7 @@ import (
 	"delivery/internal/adapters/out/postgres"
 	"delivery/internal/core/application/usecases/commands"
 	"delivery/internal/core/application/usecases/queries"
-	services "delivery/internal/core/domain/sevices"
+	"delivery/internal/core/domain/sevices"
 	"delivery/internal/core/ports"
 	"delivery/internal/jobs"
 	"github.com/robfig/cron/v3"
@@ -43,7 +43,7 @@ func (cr *CompositionRoot) NewUnitOfWork() ports.UnitOfWork {
 }
 
 func (cr *CompositionRoot) NewCreateOrderCommandHandler() commands.CreateOrderCommandHandler {
-	createOrderCommandHandler, err := commands.NewCreateOrderCommandHandler(cr.NewUnitOfWork())
+	createOrderCommandHandler, err := commands.NewCreateOrderCommandHandler(cr.NewUnitOfWork(), cr.NewGeoClient())
 	if err != nil {
 		log.Fatalf("cannot create CreateOrderCommandHandler: %v", err)
 	}
