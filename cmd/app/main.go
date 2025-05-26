@@ -21,6 +21,7 @@ import (
 	"gorm.io/gorm"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -95,9 +96,13 @@ func crateDbIfNotExists(host string, port string, user string,
 	defer db.Close()
 
 	// Создаём базу данных, если её нет
-	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s", dbName))
+	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE "%s"`, dbName))
 	if err != nil {
-		log.Printf("Ошибка создания БД (возможно, уже существует): %v", err)
+		if strings.Contains(err.Error(), "already exists") {
+			log.Printf("БД уже существует, продолжаем.")
+		} else {
+			log.Fatalf("Ошибка создания БД: %v", err)
+		}
 	}
 }
 
@@ -182,13 +187,16 @@ func startWebServer(compositionRoot *cmd.CompositionRoot, port string) {
 		AllowMethods: []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.OPTIONS},
 	}))
 
+	// 👇 Регистрируем /openapi.json до валидатора
+	registerSwaggerOpenApi(e)
+
 	spec, err := servers.GetSwagger()
 	if err != nil {
 		log.Fatalf("Error reading OpenAPI spec: %v", err)
 	}
 	e.Use(oam.OapiRequestValidator(spec))
+
 	e.Pre(middleware.RemoveTrailingSlash())
-	registerSwaggerOpenApi(e)
 	registerSwaggerUi(e)
 	servers.RegisterHandlers(e, handlers)
 	e.Logger.Fatal(e.Start(fmt.Sprintf("0.0.0.0:%s", port)))
@@ -239,11 +247,11 @@ func registerSwaggerUi(e *echo.Echo) {
 
 func startCron(compositionRoot *cmd.CompositionRoot) {
 	c := cron.New()
-	_, err := c.AddJob("@every 1s", compositionRoot.NewAssignOrdersJob())
+	_, err := c.AddJob("@every 10s", compositionRoot.NewAssignOrdersJob())
 	if err != nil {
 		log.Fatalf("ошибка при добавлении задачи: %v", err)
 	}
-	_, err = c.AddJob("@every 1s", compositionRoot.NewMoveCouriersJob())
+	_, err = c.AddJob("@every 10s", compositionRoot.NewMoveCouriersJob())
 	if err != nil {
 		log.Fatalf("ошибка при добавлении задачи: %v", err)
 	}
