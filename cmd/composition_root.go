@@ -3,12 +3,16 @@ package cmd
 import (
 	kafkain "delivery/internal/adapters/in/kafka"
 	grpcout "delivery/internal/adapters/out/grpc/geo"
+	kafkaout "delivery/internal/adapters/out/kafka"
 	"delivery/internal/adapters/out/postgres"
+	"delivery/internal/core/application/eventhandlers"
 	"delivery/internal/core/application/usecases/commands"
 	"delivery/internal/core/application/usecases/queries"
+	"delivery/internal/core/domain/model/order"
 	"delivery/internal/core/domain/sevices"
 	"delivery/internal/core/ports"
 	"delivery/internal/jobs"
+	"delivery/internal/pkg/ddd"
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 	"log"
@@ -133,4 +137,28 @@ func (cr *CompositionRoot) NewBasketConfirmedConsumer() kafkain.BasketConfirmedC
 	}
 	cr.RegisterCloser(consumer)
 	return consumer
+}
+
+func (cr *CompositionRoot) NewOrderCompletedDomainEventHandler() ddd.EventHandler {
+	producer := cr.NewOrderProducer()
+	handler, err := eventhandlers.NewOrderCompletedDomainEventHandler(producer)
+	if err != nil {
+		log.Fatalf("cannot create OrderCompletedDomainEventHandler: %v", err)
+	}
+	return handler
+}
+
+func (cr *CompositionRoot) NewMediatrWithSubscriptions() ddd.Mediatr {
+	mediatr := ddd.NewMediatr()
+	mediatr.Subscribe(cr.NewOrderCompletedDomainEventHandler(), order.NewEmptyCompletedDomainEvent())
+	return mediatr
+}
+
+func (cr *CompositionRoot) NewOrderProducer() ports.OrderProducer {
+	producer, err := kafkaout.NewOrderProducer([]string{cr.configs.KafkaHost}, cr.configs.KafkaOrderChangedTopic)
+	if err != nil {
+		log.Fatalf("cannot create OrderProducer: %v", err)
+	}
+	cr.RegisterCloser(producer)
+	return producer
 }

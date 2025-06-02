@@ -6,6 +6,7 @@ import (
 	"delivery/internal/pkg/errs"
 	"errors"
 	"github.com/google/uuid"
+	"math/rand"
 )
 
 var (
@@ -31,13 +32,21 @@ func NewCourier(name string, speed int, location kernel.Location) (*Courier, err
 		return nil, err
 	}
 
-	return &Courier{
+	courier := &Courier{
 		id:               uuid.New(),
 		name:             name,
 		speed:            speed,
 		location:         location,
 		storagePlaceList: make([]*StoragePlace, 0),
-	}, nil
+	}
+
+	capacity := rand.Intn(31) + 10
+	err := courier.AddStoragePlace("bag", capacity)
+	if err != nil {
+		return nil, err
+	}
+
+	return courier, nil
 }
 
 func (c *Courier) AddStoragePlace(name string, totalVolume int) error {
