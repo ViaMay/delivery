@@ -139,6 +139,7 @@ func (cr *CompositionRoot) NewBasketConfirmedConsumer() kafkain.BasketConfirmedC
 	return consumer
 }
 
+
 func (cr *CompositionRoot) NewOrderCompletedDomainEventHandler() ddd.EventHandler {
 	producer := cr.NewOrderProducer()
 	handler, err := eventhandlers.NewOrderCompletedDomainEventHandler(producer)
