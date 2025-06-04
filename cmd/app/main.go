@@ -94,7 +94,12 @@ func crateDbIfNotExists(host string, port string, user string,
 	if err != nil {
 		log.Fatalf("Ошибка подключения к PostgreSQL: %v", err)
 	}
-	defer db.Close()
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+
+		}
+	}(db)
 
 	// Создаём базу данных, если её нет
 	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE "%s"`, dbName))

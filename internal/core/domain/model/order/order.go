@@ -2,13 +2,14 @@ package order
 
 import (
 	"delivery/internal/core/domain/model/kernel"
+	"delivery/internal/pkg/ddd"
 	"delivery/internal/pkg/errs"
 	"errors"
 	"github.com/google/uuid"
 )
 
 type Order struct {
-	id        uuid.UUID
+	*ddd.BaseAggregate[uuid.UUID]
 	courierId *uuid.UUID
 	location  kernel.Location
 	volume    int
@@ -26,10 +27,10 @@ func NewOrder(orderID uuid.UUID, location kernel.Location, volume int) (*Order, 
 		return nil, errs.NewValueIsRequiredError("volume")
 	}
 	return &Order{
-		id:       orderID,
-		location: location,
-		volume:   volume,
-		status:   StatusCreated,
+		BaseAggregate: ddd.NewBaseAggregate[uuid.UUID](orderID),
+		location:      location,
+		volume:        volume,
+		status:        StatusCreated,
 	}, nil
 }
 
@@ -47,17 +48,21 @@ func (o *Order) Complete() error {
 		return errors.New("only assigned orders can be completed")
 	}
 	o.status = StatusCompleted
+
+	// Публикуем доменное событие
+	o.BaseAggregate.RaiseDomainEvent(NewCompletedDomainEvent(o))
+
 	return nil
 }
 func (o *Order) Equals(other *Order) bool {
 	if other == nil {
 		return false
 	}
-	return o.id == other.id
+	return o.ID() == other.ID()
 }
 
 func (o *Order) Id() uuid.UUID {
-	return o.id
+	return o.ID()
 }
 
 func (o *Order) CourierId() *uuid.UUID {
@@ -78,10 +83,10 @@ func (o *Order) Status() Status {
 
 func RestoreOrder(id uuid.UUID, courierID *uuid.UUID, location kernel.Location, volume int, status Status) *Order {
 	return &Order{
-		id:        id,
-		courierId: courierID,
-		location:  location,
-		volume:    volume,
-		status:    status,
+		BaseAggregate: ddd.NewBaseAggregate(id),
+		courierId:     courierID,
+		location:      location,
+		volume:        volume,
+		status:        status,
 	}
 }
