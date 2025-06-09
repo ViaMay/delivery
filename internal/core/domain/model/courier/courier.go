@@ -3,6 +3,7 @@ package courier
 import (
 	"delivery/internal/core/domain/model/kernel"
 	"delivery/internal/core/domain/model/order"
+	"delivery/internal/pkg/ddd"
 	"delivery/internal/pkg/errs"
 	"errors"
 	"github.com/google/uuid"
@@ -14,7 +15,7 @@ var (
 )
 
 type Courier struct {
-	id               uuid.UUID
+	*ddd.BaseAggregate[uuid.UUID]
 	name             string
 	speed            int
 	location         kernel.Location
@@ -33,7 +34,7 @@ func NewCourier(name string, speed int, location kernel.Location) (*Courier, err
 	}
 
 	courier := &Courier{
-		id:               uuid.New(),
+		BaseAggregate:    ddd.NewBaseAggregate(uuid.New()),
 		name:             name,
 		speed:            speed,
 		location:         location,
@@ -140,11 +141,11 @@ func (c *Courier) Equal(other *Courier) bool {
 	if other == nil {
 		return false
 	}
-	return c.id == other.id
+	return c.ID() == other.ID()
 }
 
 func (c *Courier) ID() uuid.UUID {
-	return c.id
+	return c.BaseAggregate.ID()
 }
 
 func (c *Courier) Name() string {
@@ -169,7 +170,7 @@ func (c *Courier) StoragePlaces() []StoragePlace {
 
 func RestoreCourier(id uuid.UUID, name string, speed int, location kernel.Location, storagePlaces []*StoragePlace) *Courier {
 	return &Courier{
-		id:               id,
+		BaseAggregate:    ddd.NewBaseAggregate(id),
 		name:             name,
 		speed:            speed,
 		location:         location,

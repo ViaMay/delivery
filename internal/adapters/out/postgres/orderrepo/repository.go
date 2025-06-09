@@ -7,7 +7,6 @@ import (
 	"delivery/internal/pkg/errs"
 	"delivery/internal/pkg/uow"
 	"errors"
-
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -21,40 +20,59 @@ type Repository struct {
 
 func NewRepository(tracker uow.Tracker) (*Repository, error) {
 	if tracker == nil {
-		return nil, errs.NewValueIsRequiredError("uow")
+		return nil, errs.NewValueIsRequiredError("tracker")
 	}
-	return &Repository{tracker: tracker}, nil
+
+	return &Repository{
+		tracker: tracker,
+	}, nil
 }
 
 func (r *Repository) Add(ctx context.Context, aggregate *order.Order) error {
-	return r.saveWithTx(ctx, DomainToDTO(aggregate), true)
-}
+	r.tracker.Track(aggregate)
+	dto := DomainToDTO(aggregate)
 
-func (r *Repository) Update(ctx context.Context, aggregate *order.Order) error {
-	return r.saveWithTx(ctx, DomainToDTO(aggregate), false)
-}
-
-func (r *Repository) saveWithTx(ctx context.Context, dto OrderDTO, isCreate bool) error {
-	r.tracker.Track(DtoToDomain(dto))
-
-	inTx := r.tracker.InTx()
-	if !inTx {
+	isInTransaction := r.tracker.InTx()
+	if !isInTransaction {
 		r.tracker.Begin(ctx)
 	}
 	tx := r.tracker.Tx()
 
-	session := tx.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true})
-	var err error
-	if isCreate {
-		err = session.Create(&dto).Error
-	} else {
-		err = session.Save(&dto).Error
-	}
+	err := tx.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true}).Create(&dto).Error
 	if err != nil {
+		if !isInTransaction {
+			_ = r.tracker.Rollback(ctx) // 🔁 rollback при ошибке
+		}
 		return err
 	}
 
-	if !inTx {
+	if !isInTransaction {
+		if err := r.tracker.Commit(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) Update(ctx context.Context, aggregate *order.Order) error {
+	r.tracker.Track(aggregate)
+	dto := DomainToDTO(aggregate)
+
+	isInTransaction := r.tracker.InTx()
+	if !isInTransaction {
+		r.tracker.Begin(ctx)
+	}
+	tx := r.tracker.Tx()
+
+	err := tx.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true}).Save(&dto).Error
+	if err != nil {
+		if !isInTransaction {
+			_ = r.tracker.Rollback(ctx) // 🔁 rollback при ошибке
+		}
+		return err
+	}
+
+	if !isInTransaction {
 		if err := r.tracker.Commit(ctx); err != nil {
 			return err
 		}
@@ -63,62 +81,65 @@ func (r *Repository) saveWithTx(ctx context.Context, dto OrderDTO, isCreate bool
 }
 
 func (r *Repository) Get(ctx context.Context, ID uuid.UUID) (*order.Order, error) {
-	var dto OrderDTO
-	tx := r.txOrDb()
+	dto := OrderDTO{}
 
-	if err := tx.WithContext(ctx).Preload(clause.Associations).First(&dto, ID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
+	tx := r.getTxOrDb()
+	result := tx.WithContext(ctx).
+		Preload(clause.Associations).
+		Find(&dto, ID)
+	if result.RowsAffected == 0 {
+		return nil, nil
 	}
-	return DtoToDomain(dto), nil
+
+	aggregate := DtoToDomain(dto)
+	return aggregate, nil
 }
 
 func (r *Repository) GetFirstInCreatedStatus(ctx context.Context) (*order.Order, error) {
-	var dto OrderDTO
-	err := r.txOrDb().WithContext(ctx).
+	dto := OrderDTO{}
+
+	tx := r.getTxOrDb()
+	result := tx.WithContext(ctx).
 		Preload(clause.Associations).
 		Where("status = ?", order.StatusCreated).
-		First(&dto).Error
-
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errs.NewObjectNotFoundError("Order (Status=Created)", nil)
+		First(&dto)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, errs.NewObjectNotFoundError("Free courier", nil)
 		}
-		return nil, err
+		return nil, result.Error
 	}
-	return DtoToDomain(dto), nil
+
+	aggregate := DtoToDomain(dto)
+	return aggregate, nil
 }
 
 func (r *Repository) GetAllInAssignedStatus(ctx context.Context) ([]*order.Order, error) {
 	var dtos []OrderDTO
-	err := r.txOrDb().WithContext(ctx).
+
+	tx := r.getTxOrDb()
+	result := tx.WithContext(ctx).
 		Preload(clause.Associations).
 		Where("status = ?", order.StatusAssigned).
-		Find(&dtos).Error
-
-	if err != nil {
-		return nil, err
+		Find(&dtos)
+	if result.Error != nil {
+		return nil, result.Error
 	}
-	if len(dtos) == 0 {
+	if result.RowsAffected == 0 {
 		return nil, errs.NewObjectNotFoundError("Assigned orders", nil)
 	}
 
-	return mapDtosToAggregates(dtos), nil
+	aggregates := make([]*order.Order, len(dtos))
+	for i, dto := range dtos {
+		aggregates[i] = DtoToDomain(dto)
+	}
+
+	return aggregates, nil
 }
 
-func (r *Repository) txOrDb() *gorm.DB {
+func (r *Repository) getTxOrDb() *gorm.DB {
 	if tx := r.tracker.Tx(); tx != nil {
 		return tx
 	}
 	return r.tracker.Db()
-}
-
-func mapDtosToAggregates(dtos []OrderDTO) []*order.Order {
-	aggregates := make([]*order.Order, len(dtos))
-	for i := range dtos {
-		aggregates[i] = DtoToDomain(dtos[i])
-	}
-	return aggregates
 }

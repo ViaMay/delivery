@@ -23,6 +23,15 @@ type UnitOfWork struct {
 	mediatr           ddd.Mediatr
 }
 
+func (u *UnitOfWork) Rollback(ctx context.Context) error {
+	if u.tx != nil {
+		err := u.tx.Rollback().Error
+		u.tx = nil
+		return err
+	}
+	return nil
+}
+
 func NewUnitOfWork(db *gorm.DB, mediatr ddd.Mediatr) (ports.UnitOfWork, error) {
 	if db == nil {
 		return nil, errs.NewValueIsRequiredError("db")

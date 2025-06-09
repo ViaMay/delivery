@@ -40,7 +40,7 @@ func (cr *CompositionRoot) NewDispatchService() services.DispatchService {
 }
 
 func (cr *CompositionRoot) NewUnitOfWork() ports.UnitOfWork {
-	unitOfWork, err := postgres.NewUnitOfWork(cr.gormDb)
+	unitOfWork, err := postgres.NewUnitOfWork(cr.gormDb, cr.NewMediatrWithSubscriptions())
 	if err != nil {
 		log.Fatalf("cannot create UnitOfWork: %v", err)
 	}
@@ -138,7 +138,6 @@ func (cr *CompositionRoot) NewBasketConfirmedConsumer() kafkain.BasketConfirmedC
 	cr.RegisterCloser(consumer)
 	return consumer
 }
-
 
 func (cr *CompositionRoot) NewOrderCompletedDomainEventHandler() ddd.EventHandler {
 	producer := cr.NewOrderProducer()
