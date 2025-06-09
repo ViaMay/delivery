@@ -23,7 +23,7 @@ type UnitOfWork struct {
 	mediatr           ddd.Mediatr
 }
 
-func (u *UnitOfWork) Rollback(ctx context.Context) error {
+func (u *UnitOfWork) Rollback() error {
 	if u.tx != nil {
 		err := u.tx.Rollback().Error
 		u.tx = nil

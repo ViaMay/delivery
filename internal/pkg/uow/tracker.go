@@ -13,5 +13,5 @@ type Tracker interface {
 	Track(agg ddd.AggregateRoot)
 	Begin(ctx context.Context)
 	Commit(ctx context.Context) error
-	Rollback(ctx context.Context) error
+	Rollback() error
 }
