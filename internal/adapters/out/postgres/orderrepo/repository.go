@@ -41,7 +41,7 @@ func (r *Repository) Add(ctx context.Context, aggregate *order.Order) error {
 	err := tx.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true}).Create(&dto).Error
 	if err != nil {
 		if !isInTransaction {
-			_ = r.tracker.Rollback() // 🔁
+			_ = r.tracker.Rollback()
 		}
 		return err
 	}
