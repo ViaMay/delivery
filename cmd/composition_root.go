@@ -43,7 +43,7 @@ func (cr *CompositionRoot) NewDispatchService() services.DispatchService {
 }
 
 func (cr *CompositionRoot) NewUnitOfWork() ports.UnitOfWork {
-	unitOfWork, err := postgres.NewUnitOfWork(cr.gormDb, cr.NewMediatrWithSubscriptions())
+	unitOfWork, err := postgres.NewUnitOfWork(cr.gormDb)
 	if err != nil {
 		log.Fatalf("cannot create UnitOfWork: %v", err)
 	}
