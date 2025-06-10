@@ -7,6 +7,7 @@ import (
 	"delivery/internal/core/ports"
 	"delivery/internal/pkg/ddd"
 	"delivery/internal/pkg/errs"
+	"delivery/internal/pkg/outbox"
 	"errors"
 	"github.com/labstack/gommon/log"
 	"gorm.io/gorm"
@@ -20,20 +21,24 @@ type UnitOfWork struct {
 	trackedAggregates []ddd.AggregateRoot
 	courierRepository ports.CourierRepository
 	orderRepository   ports.OrderRepository
-	mediatr           ddd.Mediatr
 }
 
-func NewUnitOfWork(db *gorm.DB, mediatr ddd.Mediatr) (ports.UnitOfWork, error) {
+func (u *UnitOfWork) Rollback() error {
+	if u.tx != nil {
+		err := u.tx.Rollback().Error
+		u.tx = nil
+		return err
+	}
+	return nil
+}
+
+func NewUnitOfWork(db *gorm.DB) (ports.UnitOfWork, error) {
 	if db == nil {
 		return nil, errs.NewValueIsRequiredError("db")
 	}
-	if mediatr == nil {
-		return nil, errs.NewValueIsRequiredError("mediatr")
-	}
 
 	uow := &UnitOfWork{
-		db:      db,
-		mediatr: mediatr,
+		db: db,
 	}
 
 	courierRepo, err := courierrepo.NewRepository(uow)
@@ -94,14 +99,13 @@ func (u *UnitOfWork) Commit(ctx context.Context) error {
 		}
 	}()
 
+	if err := u.persistDomainEvents(ctx, u.tx); err != nil {
+		return err
+	}
+
 	if err := u.tx.WithContext(ctx).Commit().Error; err != nil {
 		return err
 	}
-
-	if err := u.publishDomainEvents(ctx); err != nil {
-		return err
-	}
-
 	committed = true
 	u.clearTx()
 
@@ -113,16 +117,18 @@ func (u *UnitOfWork) clearTx() {
 	u.trackedAggregates = nil
 }
 
-func (u *UnitOfWork) publishDomainEvents(ctx context.Context) error {
-	for _, aggregate := range u.trackedAggregates {
-		for _, event := range aggregate.GetDomainEvents() {
-			err := u.mediatr.Publish(ctx, event)
-			if err != nil {
-				log.Error(err)
-				continue
+func (u *UnitOfWork) persistDomainEvents(ctx context.Context, tx *gorm.DB) error {
+	for _, agg := range u.trackedAggregates {
+		outboxEvents, err := outbox.EncodeDomainEvents(agg.GetDomainEvents())
+		if err != nil {
+			return err
+		}
+		if len(outboxEvents) > 0 {
+			if err := tx.WithContext(ctx).Create(&outboxEvents).Error; err != nil {
+				return err
 			}
 		}
-		aggregate.ClearDomainEvents()
+		agg.ClearDomainEvents()
 	}
 	return nil
 }

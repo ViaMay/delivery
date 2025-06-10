@@ -54,6 +54,7 @@ func (o *Order) Complete() error {
 
 	return nil
 }
+
 func (o *Order) Equals(other *Order) bool {
 	if other == nil {
 		return false
